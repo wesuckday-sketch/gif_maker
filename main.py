@@ -1,88 +1,94 @@
 import os
-from tkinter import *
-from tkinter import filedialog
+from PIL import Image
+from PySide6.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QLineEdit, QFileDialog
+import sys
 
-#Functions
-selected_folder = ""
+class GifMakerApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Wesuckday's GIF Maker")
+        self.setGeometry(100, 100, 400, 200)
+        self.folder_path = ""
 
-def choose_folder():
-    global selected_folder
-    selected_folder = filedialog.askdirectory()
-    
-    if selected_folder:
-        folder_label.config(text=selected_folder)
-        status_label.config(text="Folder selected")
-        print("Folder selected:", selected_folder)
+        layout = QVBoxLayout()
 
-def generate_gif():
-    try:
-        from PIL import Image as PILImage
-    except ImportError:
-        status_label.config(text="Pillow is not installed")
-        return
+        self.folder_button = QPushButton("Choose Frames Folder")
+        self.folder_button.clicked.connect(self.select_folder)
+        layout.addWidget(self.folder_button)
 
-    folder_path = selected_folder or "frames"
-    output_name = output_entry.get().strip() or "animation.gif"
+        self.folder_label = QLabel("No folder selected")
+        layout.addWidget(self.folder_label)
 
-    try:
-        fps = int(fps_entry.get().strip())
-    except ValueError:
-        status_label.config(text="FPS must be a number")
-        return
+        self.output_entry = QLineEdit()
+        self.output_entry.setPlaceholderText("Output GIF name (default: animation.gif)")
+        layout.addWidget(self.output_entry)
 
-    frames = []
-    for filename in sorted(os.listdir(folder_path)):
-        if filename.endswith(".png"):
-            frames.append(
-                PILImage.open(os.path.join(folder_path, filename))
-            )   
+        self.fps_entry = QLineEdit()
+        self.fps_entry.setPlaceholderText("Frames per second (default: 10)")
+        layout.addWidget(self.fps_entry)
 
-    if not frames:
-        status_label.config(text="No PNG frames found")
-        return
+        self.generate_button = QPushButton("Generate GIF")
+        self.generate_button.clicked.connect(self.generate_gif)
+        layout.addWidget(self.generate_button)
 
-    frames[0].save(
-    output_name,
-    save_all=True,
-    append_images=frames[1:],
-    duration=max(1, int(1000 / fps)),
-    loop=0
-    )
-    status_label.config(text=f"Saved {output_name}")
+        self.status_label = QLabel("")
+        layout.addWidget(self.status_label)
 
+        self.setLayout(layout)
 
-#User Interface
-root = Tk()
-root.title("Wesuckday's GIF Maker")
-root.geometry("400x250")
+    def select_folder(self):
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Frames Folder")
+        if folder_path:
+            self.folder_path = folder_path
+            self.folder_label.setText(folder_path)
+            self.status_label.setText("Folder selected")
+            print("Folder selected:", folder_path)
 
-folder_label = Label(root, text="No folder selected")
-folder_label.pack()
+    def generate_gif(self):
+        output_name = self.output_entry.text() or "animation.gif"
+        fps_text = self.fps_entry.text()
+        try:
+            fps = int(fps_text) if fps_text else 10
+        except ValueError:
+            self.status_label.setText("FPS must be a number")
+            return
 
-output_label = Label(root, text="Output Name")
-output_label.pack()
+        if not self.folder_path:
+            self.status_label.setText("Select a folder first")
+            return
 
-output_entry = Entry(root)
-output_entry.insert(0, "animation.gif")
-output_entry.pack()
+        self.status_label.setText("Generating GIF...")
+        try:
+            frames = []
+            for filename in sorted(os.listdir(self.folder_path)):
+                if filename.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif")):
+                    path = os.path.join(self.folder_path, filename)
+                    frames.append(Image.open(path).convert("RGBA"))
 
-fps_label = Label(root, text="FPS")
-fps_label.pack()
+            if not frames:
+                self.status_label.setText("No image files in folder")
+                return
 
-fps_entry = Entry(root)
-fps_entry.insert(0,"12")
-fps_entry.pack()
+            frames[0].save(
+                output_name,
+                save_all=True,
+                append_images=frames[1:],
+                duration=int(1000 / fps),
+                loop=0
+            )
 
-generate_button = Button(root, text="Generate GIF", command=generate_gif)
-generate_button.pack(pady=10)
+            self.status_label.setText(f"GIF generated: {output_name}")
+            print("Output:", output_name)
+            print("FPS:", fps)
+        except Exception as e:
+            self.status_label.setText(f"Error: {e}")
+            print("Error generating GIF:", e)
 
-Button(root, text="Select Frames Folder", command=choose_folder).pack()
-
-status_label = Label(root, text="Ready")
-status_label.pack()
-
-root.mainloop()
-
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = GifMakerApp()
+    window.show()
+    sys.exit(app.exec())
 
 
 
